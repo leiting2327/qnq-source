@@ -1,0 +1,11 @@
+# ===== 生产版 Caddyfile（Ubuntu 服务器）=====
+# 1. 把下面 qnq.你的域名.com 换成你真实的域名
+#    并在域名控制台把该域名的 A 记录指向服务器公网 IP
+# 2. 放入 /etc/caddy/Caddyfile 后执行:  sudo systemctl reload caddy
+# 3. Caddy 会自动申请 Let's Encrypt 证书并自动续期，全程 HTTPS
+
+qnq.你的域名.com {
+	root * /var/www/qnq
+	encode gzip
+	file_server
+}
