@@ -13,5 +13,12 @@
             "downUrl": "https://leiting2327.github.io/qnq-source/apps/test.ipa",
             "minIos": "15.0"
         }
+    ],
+    "news": [
+        {
+            "title": "本软件源免费 · GitHub 托管",
+            "content": "本软件源为免费源，托管于 GitHub Pages，长期可用、免备案。仅收录本人拥有版权或正版授权的应用，请勿用于分发破解、盗版、多开外挂类内容。下载的 IPA 需自行导入证书签名后安装。",
+            "time": "2026-09-23"
+        }
     ]
 }
