@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全能签软件源管理后台</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f4f6f8;color:#222;padding:16px;max-width:640px;margin:0 auto}
+  h1{font-size:20px;margin-bottom:4px}
+  .sub{font-size:12px;color:#888;margin-bottom:16px}
+  .card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:14px}
+  .card h2{font-size:15px;margin-bottom:10px}
+  label{display:block;font-size:12px;color:#555;margin:8px 0 4px}
+  input[type=text],input[type=password],input[type=file]{width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:14px}
+  input[type=file]{background:#fafafa}
+  .row{display:flex;gap:8px}
+  .row>div{flex:1}
+  .btn{display:inline-block;background:#1565c0;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;margin-top:10px}
+  .btn.secondary{background:#e0e0e0;color:#333}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .status{font-size:13px;margin-top:10px;padding:8px 10px;border-radius:8px;display:none}
+  .status.ok{display:block;background:#e6f4ea;color:#1b5e20}
+  .status.err{display:block;background:#ffe9ec;color:#b71c1c}
+  .status.info{display:block;background:#e8f0fb;color:#0d47a1}
+  .app{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
+  .app:last-child{border-bottom:none}
+  .app .info{flex:1}
+  .app .name{font-weight:600}
+  .app .meta{font-size:12px;color:#888;margin-top:2px}
+  .app .del{color:#c62828;background:none;border:none;cursor:pointer;font-size:13px}
+  .tip{font-size:12px;color:#888;margin-top:8px;line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>全能签软件源管理后台</h1>
+  <div class="sub">管理你的源：<code>https://leiting2327.github.io/qnq-source/appstore.json</code></div>
+
+  <div class="card">
+    <h2>① GitHub Token（必填）</h2>
+    <input type="password" id="token" placeholder="粘贴你的 GitHub Token（需 repo 权限）" autocomplete="off">
+    <button class="btn" onclick="saveToken()">保存 Token</button>
+    <div class="status" id="tokenStatus"></div>
+    <div class="tip">Token 只保存在你当前浏览器本地（localStorage），请求直接发给 api.github.com，不会传到第三方。建议单独创建一个只给本仓库用的 Fine-grained token。</div>
+  </div>
+
+  <div class="card">
+    <h2>② 添加应用</h2>
+    <div class="row">
+      <div><label>应用名 *</label><input type="text" id="f_name" placeholder="如：我的测试App"></div>
+      <div><label>版本 *</label><input type="text" id="f_ver" value="1.0"></div>
+    </div>
+    <div class="row">
+      <div><label>Bundle ID *</label><input type="text" id="f_bundle" placeholder="com.example.app"></div>
+      <div><label>最低iOS</label><input type="text" id="f_minios" placeholder="15.0"></div>
+    </div>
+    <label>更新说明</label><input type="text" id="f_desc" placeholder="可选">
+    <div class="row">
+      <div><label>IPA 文件 *</label><input type="file" id="f_ipa" accept=".ipa"></div>
+      <div><label>图标 (png) 可选</label><input type="file" id="f_icon" accept=".png,.jpg,.jpeg"></div>
+    </div>
+    <button class="btn" id="btnAdd" onclick="addApp()">添加并发布</button>
+    <div class="status" id="addStatus"></div>
+    <div class="tip">说明：IPA/图标会先上传到仓库 apps/ 和 icons/ 目录，再更新 appstore.json。单个文件超过 100MB 无法用此方式上传。</div>
+  </div>
+
+  <div class="card">
+    <h2>③ 当前源内应用</h2>
+    <button class="btn secondary" onclick="loadApps()">刷新列表</button>
+    <div id="appList" style="margin-top:10px"></div>
+    <div class="status" id="listStatus"></div>
+  </div>
+
+<script>
+const OWNER="leiting2327", REPO="qnq-source", API="https://api.github.com";
+function tok(){return document.getElementById('token').value.trim();}
+function api(url, method, body, isBinary){
+  const h={Authorization:'token '+tok(), 'Accept':'application/vnd.github+json'};
+  if(body) h['Content-Type']=isBinary?'application/octet-stream':'application/json';
+  return fetch(url,{method,headers:h,body:body||undefined}).then(async r=>{
+    const t=await r.text();
+    let j;try{j=t?JSON.parse(t):null}catch(e){j=null}
+    if(!r.ok) throw new Error((j&&(j.message||j.errors?.[0]?.message))||'HTTP '+r.status);
+    return j;
+  });
+}
+function saveToken(){
+  localStorage.setItem('qnq_token',tok());
+  set('tokenStatus','已保存 Token','ok');
+}
+window.addEventListener('load',()=>{
+  if(localStorage.getItem('qnq_token')) document.getElementById('token').value=localStorage.getItem('qnq_token');
+});
+function esc(s){return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function set(id,msg,cls){const e=document.getElementById(id);e.className='status '+cls;e.textContent=msg;}
+
+async function getJson(){
+  return api(`${API}/repos/${OWNER}/${REPO}/contents/appstore.json`);
+}
+async function putJson(content, sha){
+  return api(`${API}/repos/${OWNER}/${REPO}/contents/appstore.json`,'PUT',
+    JSON.stringify({message:'[后台] 更新软件源',content:btoa(unescape(encodeURIComponent(content))),sha}),false);
+}
+async function uploadFile(path, file){
+  const b64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result.split(',')[1]);fr.onerror=rej;fr.readAsDataURL(file);});
+  return api(`${API}/repos/${OWNER}/${REPO}/contents/${path}`,'PUT',
+    JSON.stringify({message:'[后台] 上传 '+path,content:b64}),false);
+}
+function safeName(s){return (s||'').trim().replace(/[^\w\u4e00-\u9fa5]+/g,'_')||'app';}
+
+async function loadApps(){
+  set('listStatus','加载中…','info');
+  document.getElementById('appList').innerHTML='';
+  try{
+    const j=await getJson();
+    const data=JSON.parse(unescape(decodeURIComponent(atob(j.content))));
+    const apps=data.apps||[];
+    document.getElementById('appList').innerHTML=apps.length
+      ?apps.map((a,i)=>`<div class="app"><div class="info"><div class="name">${esc(a.name)} v${esc(a.version)}</div><div class="meta">${esc(a.bundleId)}</div></div><button class="del" onclick="delApp(${i})">删除</button></div>`).join('')
+      :'<div style="color:#888;font-size:13px">源内暂无应用</div>';
+    set('listStatus','共 '+apps.length+' 个应用','ok');
+  }catch(e){set('listStatus','加载失败：'+e.message,'err');}
+}
+async function delApp(i){
+  if(!confirm('确定删除第 '+(i+1)+' 个应用？(仅移除清单记录，不删除已上传的ipa文件)'))return;
+  try{
+    const j=await getJson();
+    const data=JSON.parse(unescape(decodeURIComponent(atob(j.content))));
+    data.apps.splice(i,1);
+    await putJson(JSON.stringify(data,null,4), j.sha);
+    set('listStatus','已删除','ok'); loadApps();
+  }catch(e){set('listStatus','删除失败：'+e.message,'err');}
+}
+async function addApp(){
+  const name=document.getElementById('f_name').value.trim();
+  const bundle=document.getElementById('f_bundle').value.trim();
+  const ver=document.getElementById('f_ver').value.trim();
+  const ipa=document.getElementById('f_ipa').files[0];
+  if(!name||!bundle||!ver||!ipa){set('addStatus','请填写应用名/Bundle ID/版本 并选择 IPA 文件','err');return;}
+  if(!tok()){set('addStatus','请先在①填写并保存 GitHub Token','err');return;}
+  const btn=document.getElementById('btnAdd'); btn.disabled=true;
+  set('addStatus','正在上传并发布…','info');
+  const base='https://leiting2327.github.io/qnq-source';
+  const fname=safeName(name);
+  try{
+    const ipaPath='apps/'+fname+'.ipa';
+    await uploadFile(ipaPath, ipa);
+    let icon='';
+    const iconFile=document.getElementById('f_icon').files[0];
+    if(iconFile){
+      const ext=iconFile.name.split('.').pop().toLowerCase().match(/^jpe?g$/)?'jpg':(iconFile.name.split('.').pop()||'png');
+      const iconPath='icons/'+fname+'.'+ext;
+      await uploadFile(iconPath, iconFile);
+      icon=base+'/'+iconPath;
+    }
+    const j=await getJson();
+    const data=JSON.parse(unescape(decodeURIComponent(atob(j.content))));
+    const now=new Date();
+    const pad=n=>String(n).padStart(2,'0');
+    const vd=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+'T'+pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+'+08:00';
+    data.apps.push({
+      name, type:"4", version:ver, versionDate:vd,
+      versionDescription:document.getElementById('f_desc').value.trim()||'',
+      bundleId:bundle, icon, downUrl:base+'/'+ipaPath,
+      minIos:document.getElementById('f_minios').value.trim()
+    });
+    await putJson(JSON.stringify(data,null,4), j.sha);
+    set('addStatus','✓ 发布成功！全能签里刷新源即可看到 '+name,'ok');
+    document.getElementById('f_name').value='';document.getElementById('f_desc').value='';
+    document.getElementById('f_ipa').value='';document.getElementById('f_icon').value='';
+    loadApps();
+  }catch(e){set('addStatus','发布失败：'+e.message,'err');}
+  finally{btn.disabled=false;}
+}
+</script>
+</body>
+</html>
