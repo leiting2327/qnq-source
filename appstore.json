@@ -1,5 +1,17 @@
 {
     "name": "我的自建源",
     "sourceicon": "https://leiting2327.github.io/qnq-source/icons/sourceicon.png",
-    "apps": []
+    "apps": [
+        {
+            "name": "测试软件",
+            "type": "4",
+            "version": "1.0",
+            "versionDate": "2026-09-23T20:29:34+08:00",
+            "versionDescription": "软件源链路测试",
+            "bundleId": "com.test.demo",
+            "icon": "https://leiting2327.github.io/qnq-source/icons/testicon.png",
+            "downUrl": "https://leiting2327.github.io/qnq-source/apps/test.ipa",
+            "minIos": "15.0"
+        }
+    ]
 }
